@@ -1,0 +1,1 @@
+scipy, numpy, pandas, matplotlib, easymoney, csv, json
