@@ -3,10 +3,16 @@ import csv
 import json
 import pandas as pd 
 import matplotlib.pyplot as plt 
-from easymoney.money import EasyPeasy
 
+def get_genres(string):
+  genre_list = []
+  parsed_genres = json.loads(string)
+  for genre in parsed_genres: 
+    genre_list.append(genre["name"])
+  
+  return genre_list
+  
 def get_cast(parsed_cast,awards):
-  ep = EasyPeasy() 
   cast_list = [] 
   count = 0  
   awardscount = 0 
@@ -110,7 +116,6 @@ def binFilmAwards(award_num):
   return(award_bin) 
 
 def binRevenue(revenue):
-
   if revenue <= 80000000: 
     revenue_bin = '10 to 80 mil' 
   elif revenue <= 200000000: 
@@ -137,29 +142,6 @@ def binRatio(ratio):
     ratio_bin = '>6'
   return(ratio_bin) 
   
-def genresParse(string): 
-  genre_list = [0,0,0,0,0,0]
-  parsed_genres = json.loads(string) 
-  for genre in parsed_genres: 
-    if genre["name"] == 'Action' or genre["name"] == 	'Adventure': 
-      genre_list[0] = 1 
-    elif  genre["name"] == 'Fantasy'or genre["name"] =='Science Fiction': 
-      genre_list[1] = 1
-    elif genre["name"] == 'Animation' or genre["name"] ==	'Family': 
-      genre_list[2] = 1 
-    elif genre["name"] == 'Drama': 
-      genre_list[3] = 1 
-    elif genre["name"] == 'Comedy': 
-      genre_list[4] = 1 
-    elif genre["name"] == 'Thriller' or genre["name"] == 'Crime': 
-      genre_list[5] = 1 
-    if genre["name"] == 'Documentary': 
-      genre_list = [-1,-1] 
-      break 
-  if max(genre_list) == 0: 
-    genre_list = [-1,-1]
-  return(genre_list)
-      
 def main(): 
   file1 = "tmdb_5000_movies.csv"
   file2 = "tmdb_5000_credits.csv"
@@ -168,8 +150,6 @@ def main():
   csv2_init = open(file2,encoding='utf-8')
   moviesCSV = csv.reader(csv1_init)
   creditsCSV = csv.reader(csv2_init) 
-  
-  ep = EasyPeasy()
   
   acting_awards = actors_awards_list(file3)  
   film_awards = film_awards_list(file3)
@@ -187,7 +167,7 @@ def main():
   vote_count_index = movies_header.index("vote_count")
 
   newlist = []  
-  newlist.append(['"ID"','Title','Budget','Revenue','Revenue/Budget','Vote_Average','FilmAwards','Action/Adventure','Fantasy/SciFi','Animation/Family','Drama','Comedy','Thriller/Crime','Actor1','Actor2','Actor3','Actor4','Actor5','ActorSum','WeightedSum','ActingAwards'])
+  newlist.append(['"ID"','Title','Budget','Revenue','Revenue/Budget','Vote_Average','FilmAwards'])
   
   headings = newlist[0] 
   ids = [] 
@@ -197,23 +177,42 @@ def main():
       break 
     date = int(movie[release_date_index][:4])
     language = movie[language_index] 
-    budget = float(movie[budget_index])
-    if 1970 <= date <= 2010 and language == 'en' and budget > 0: 
-      revenue = ep.normalize(amount = float(movie[revenue_index]), region = "US", from_year = date, to_year = "latest", base_currency = "USD",pretty_print = False)
-      if revenue >= 10000000:  
-        budget = ep.normalize(amount = float(movie[budget_index]), region = "US", from_year = date, to_year = "latest", base_currency = "USD",pretty_print = False)
-        ratio = revenue/budget
-        entry = [movie[id_index],movie[title_index],binBudget(budget),binRevenue(revenue),binRatio(ratio),movie[vote_average_index]]
-        if movie[title_index] in film_awards.keys(): 
-          entry.append(binFilmAwards(film_awards[movie[title_index]])) 
+    revenue = int(movie[revenue_index])
+    budget = int(movie[budget_index])
+    if 1970 <= date <= 2010 and language == "en" and revenue >= 10000000 and budget> 0:  
+      ids.append(movie[id_index])
+      ratio = revenue/budget
+      entry = [movie[id_index],movie[title_index],binBudget(budget),binRevenue(revenue),binRatio(ratio),movie[vote_average_index]]
+      if movie[title_index] in film_awards.keys(): 
+        entry.append(binFilmAwards(film_awards[movie[title_index]])) 
+      else: 
+        entry.append('0 to 2')
+      genres = get_genres(movie[genre_index]) 
+      genres_entry = [] 
+      for genre in genres: 
+        if genre not in headings: 
+          headings.append(genre) 
+      for genre2 in headings[6:]: 
+        if genre2 in genres: 
+          entry.append(1)
         else: 
-          entry.append('0 to 2')
-        genres = genresParse(movie[genre_index]) 
-        entry.extend(genres)
-        if max(genres) != -1:
-          newlist.append(entry) 
-          ids.append(movie[id_index])
-
+          entry.append(0)
+      newlist.append(entry) 
+  
+  finallength = len(newlist[0])
+  for entry in newlist: 
+    while len(entry) < finallength: 
+      entry.append(0) 
+  
+  newlist[0].append('Actor1')
+  newlist[0].append('Actor2')
+  newlist[0].append('Actor3')
+  newlist[0].append('Actor4')
+  newlist[0].append('Actor5') 
+  newlist[0].append('ActorSum')
+  newlist[0].append('WeightedSum')
+  newlist[0].append('ActingAwards')
+  
   credits_header = next(creditsCSV) 
   cast_index = credits_header.index('cast')
   creditsid_index = credits_header.index('movie_id') 
@@ -225,10 +224,52 @@ def main():
       count += 1
       parsed_cast = json.loads(movie[cast_index]) 
       newlist[count].extend(get_cast(parsed_cast,acting_awards)) 
+      
+  doclist = [] 
+  
+  for movie in newlist[1:]: 
+    if movie[newlist[0].index('Documentary')] == 1: 
+      doclist.append(movie)
+    elif movie[newlist[0].index('Actor1')] == 'NA'or movie[newlist[0].index('Actor2')] == 'NA' or movie[newlist[0].index('Actor3')] == 'NA' or movie[newlist[0].index('Actor4')] == 'NA' or movie[newlist[0].index('Actor5')] == 'NA':
+      doclist.append(movie) 
+      
+  for movie in doclist: 
+    newlist.remove(movie) 
+    ids.remove(movie[0])
+  
+  finallist = [['Title','Budget','Revenue','Revenue/Budget','Vote_Average','FilmAwards','Action/Adventure','Fantasy/SciFi','Animation/Family','Drama','Comedy','Thriller/Crime','Actor1','Actor2','Actor3','Actor4','Actor5','ActorSum','WeightedSum','ActingAwards']]
+  
+  for movie in newlist[1:]: 
+    item = [] 
+    i = 1 
+    while i<7:
+      item.append(movie[i])
+      i+=1 
+      
+    item.append(int(bool(movie[newlist[0].index('Action')] or bool(movie[newlist[0].index('Adventure')]))))  
+    item.append(int(bool(movie[newlist[0].index('Fantasy')] or bool(movie[newlist[0].index('Science Fiction')])))) 
+    item.append(int(bool(movie[newlist[0].index('Animation')] or bool(movie[newlist[0].index('Family')])))) 
+    item.append(movie[newlist[0].index('Drama')])
+    item.append(movie[newlist[0].index('Comedy')]) 
+    item.append(int(bool(movie[newlist[0].index('Thriller')] or bool(movie[newlist[0].index('Crime')]))))
+    
+    i = newlist[0].index('Actor1')
+    j = newlist[0].index('ActingAwards') 
+    
+    item.extend(movie[i:j+1])
+
+    count = 0 
+    for genre in movie[7:12]: 
+      if genre == 0:
+        count+=1
+      
+    if count < 6: 
+      finallist.append(item)
+    
 
   with open("AnalysisNew.csv","w",newline ="",encoding = "utf-8") as f:
     csvfinal = csv.writer(f) 
-    csvfinal.writerows(newlist)
+    csvfinal.writerows(finallist)
 
   csv1_init.close()
   csv2_init.close()  
