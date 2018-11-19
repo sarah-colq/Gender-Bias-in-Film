@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 from easymoney.money import EasyPeasy
 
 def get_cast(parsed_cast,awards):
-  ep = EasyPeasy() 
   cast_list = [] 
   count = 0  
   awardscount = 0 
@@ -22,7 +21,7 @@ def get_cast(parsed_cast,awards):
     else :  
       cast_list.append(1) 
   
-  weight_actor_sum = 0 
+  weighted_actor_sum = 0
   actor_sum = 0 
   
   if len(cast_list) < 5: 
@@ -32,10 +31,10 @@ def get_cast(parsed_cast,awards):
     weighted_actor_sum = 0 
   else: 
     actor_sum = cast_list[0] + cast_list[1] + cast_list[2] + cast_list[3] + cast_list[4]
-    weight_actor_sum = 10*cast_list[0] + 8*cast_list[1] + 6*cast_list[2] + 5*cast_list[3] + 5*cast_list[4]
+    weighted_actor_sum = 10*cast_list[0] + 8*cast_list[1] + 6*cast_list[2] + 5*cast_list[3] + 5*cast_list[4]
     
   cast_list.append(actor_sum)
-  cast_list.append(weight_actor_sum)
+  cast_list.append(weighted_actor_sum)
   cast_list.append(binActingAwards(awardscount))
   return cast_list
   
