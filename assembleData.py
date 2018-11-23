@@ -7,6 +7,10 @@ import numpy as np
 from easymoney.money import EasyPeasy
 
 ep = EasyPeasy()
+actor_awards = pd.read_csv("actor_awards.csv")
+actor_awards = actor_awards.set_index('Actor', drop = False)
+film_awards = pd.read_csv("film_awards.csv")
+film_awards = film_awards.set_index('Film', drop = False)
 
 
 def inflation_budget(row):
@@ -20,6 +24,13 @@ def inflation_revenue(row):
 
 def revenue_budget_ratio(row):
     return row["revenue"]/row["budget"]
+
+
+def get_awards(row):
+    if row['title'] in film_awards.index:
+        return film_awards.loc[row['title'],'Sum']
+    else:
+        return 0
 
 
 def get_genres(row):
@@ -53,7 +64,9 @@ def get_cast(row):
     parsed_cast = json.loads(row['cast'])
     cast_list = []
     count = 0
+    awards = 0
     for actor in parsed_cast:
+        name = actor["name"]
         if count >= 5:
             break
         count += 1
@@ -62,6 +75,8 @@ def get_cast(row):
             cast_list.append(0)
         else:
             cast_list.append(1)
+        if name in actor_awards.index:
+            awards += actor_awards.loc[name,'Sum']
 
     if len(cast_list) < 5:
         while len(cast_list) < 5:
@@ -74,6 +89,7 @@ def get_cast(row):
 
     cast_list.append(actor_sum)
     cast_list.append(weighted_actor_sum)
+    cast_list.append(awards)
 
     return pd.Series(cast_list)
 
@@ -81,8 +97,7 @@ def get_cast(row):
 def main():
     credits_data = pd.read_csv("tmdb_5000_credits.csv")
     movie_data = pd.read_csv("tmdb_5000_movies.csv")
-    actor_awards = pd.read_csv("actor_awards.csv")
-    film_awards = pd.read_csv("film_awards.csv")
+
     filename1 = "Analysis.csv"
     filename2 = "AnalysisBinned.csv"
 
@@ -91,6 +106,7 @@ def main():
     # final_data = pd.DataFrame(columns = col)
     # final_data_binned = pd.DataFrame(columns = col)
 
+    print(len(movie_data.index))
     credits_data = credits_data[['id','title','cast','crew']]
     movie_data = pd.merge(movie_data, credits_data, on = 'title', suffixes = ('', '_new'))
     movie_data = movie_data.set_index('title', drop=False)
@@ -111,7 +127,7 @@ def main():
     movie_data['budget'] = movie_data.apply(inflation_budget, axis = 1)
 
     movie_data['revenue'] = movie_data.apply(inflation_revenue, axis = 1)
-    rev_min = movie_data['revenue'] >= 10000000
+    rev_min = movie_data['revenue'] >= 5000000
     movie_data = movie_data[rev_min]
     movie_data['Revenue_to_Budget'] = movie_data.apply(revenue_budget_ratio,axis = 1)
 
@@ -123,16 +139,20 @@ def main():
     movie_data = movie_data[filter_genres & not_doc]
     movie_data = movie_data.drop(['genres','Documentary','original_language','release_date','year'], axis=1)
 
-    movie_data[['Actor1','Actor2','Actor3','Actor4','Actor5','Actor_Sum','Weighted_Actor_Sum']] = movie_data.apply(get_cast,axis=1)
+    movie_data['Film Awards'] = movie_data.apply(get_awards,axis = 1)
+
+    movie_data[['Actor1','Actor2','Actor3','Actor4','Actor5','Actor_Sum','Weighted_Actor_Sum','Acting Awards']] \
+        = movie_data.apply(get_cast,axis=1)
     enough_cast = movie_data['Actor_Sum'] != "NA"
     movie_data = movie_data[enough_cast]
     movie_data = movie_data.drop('cast',axis = 1)
 
     print(movie_data.head())
-    print(movie_data.keys())
-    print(movie_data.loc['Avatar'])
-    print(len(movie_data.index))
+    #print(movie_data.keys())
+    #print(movie_data.loc['Avatar'])
+    #print(len(movie_data.index))
 
+    movie_data.to_csv(filename1,columns = list(movie_data))
 
 if __name__ == "__main__":
 	sys.exit(main())
